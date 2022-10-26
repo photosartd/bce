@@ -1,0 +1,1 @@
+from .losses import GraphSageLoss, JointLinSingleStepLoss
