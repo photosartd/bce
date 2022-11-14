@@ -1,1 +1,2 @@
-from .graph_sage import GraphSAGE
+from .intended import GraphSAGE
+from .unintended import MLPClassifier
