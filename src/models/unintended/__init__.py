@@ -1,1 +1,1 @@
-from .mlp import MLPClassifier
+from .mlp import MLPClassifier, MLPRegressor
