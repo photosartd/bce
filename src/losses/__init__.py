@@ -1,1 +1,1 @@
-from .losses import GraphSageLoss, JointLinSingleStepLoss
+from .losses import *

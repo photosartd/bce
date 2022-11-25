@@ -1,5 +1,7 @@
+import pickle as pkl
 from abc import ABC, abstractmethod
 from functools import cached_property
+from typing import Union
 
 import torch
 import torch.nn as nn
@@ -13,7 +15,7 @@ from src.utils.constants import ModelType
 class ModelInterface(nn.Module, Saveable, ABC):
     def __init__(self,
                  loss: nn.Module,
-                 device: str = "cpu",
+                 device: Union[str, torch._C.device] = "cpu",
                  model_type: ModelType = ModelType.NOT_DEFINED,
                  **kwargs
                  ):
@@ -39,14 +41,11 @@ class ModelInterface(nn.Module, Saveable, ABC):
         )
 
     def save(self, savepath, **kwargs) -> None:
-        torch.save(self.state_dict(), savepath)
+        with open(savepath, "wb") as f:
+            pkl.dump(self, f)
 
     @classmethod
     def load(cls, path, **kwargs):
-        loss = kwargs.get("loss")
-        device = kwargs.get("device") if kwargs.get("device") else "cpu"
-        model = cls(loss=loss,
-                    device=device
-                    )
-        model.load_state_dict(torch.load(path))
+        with open(path, "rb") as f:
+            model = pkl.load(f)
         return model

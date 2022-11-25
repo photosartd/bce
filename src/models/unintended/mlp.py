@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 from torchmetrics import MetricCollection
 from torchmetrics.classification import MulticlassF1Score, MulticlassAccuracy, MulticlassPrecision, MulticlassRecall
+from torchmetrics.regression import MeanAbsoluteError, MeanSquaredError, MeanAbsolutePercentageError
 
 from src.interfaces import ModelInterface
 from src.utils.constants import ModelType
@@ -75,6 +76,8 @@ class MLP(ModelInterface, ABC):
             optimizer.zero_grad()
 
             y_pred = self.forward(x)
+            if self.model_type == ModelType.REGRESSION:
+                y_pred = y_pred.squeeze(-1)
             loss = self.loss(y_pred, y)
             loss.backward()
             optimizer.step()
@@ -106,6 +109,7 @@ class MLP(ModelInterface, ABC):
             if self.model_type == ModelType.CLASSIFICATION:
                 predictions.append(torch.argmax(self.nonlinearity(y_pred_distr), dim=-1).detach().cpu())
             elif self.model_type == ModelType.REGRESSION:
+                y_pred_distr = y_pred_distr.squeeze(-1)
                 predictions.append(y_pred_distr.detach().cpu())
             else:
                 raise NotImplementedError("Wrong model type for MLP")
@@ -152,7 +156,7 @@ class MLPClassifier(MLP):
 
 
 class MLPRegressor(MLP):
-    """A usual MLP module for regression with several layers (no unlinearity at the end)"""
+    """A usual MLP module for regression with several layers (no nonlinearity at the end)"""
 
     def __init__(self, loss: nn.Module, input_size: int, output_size: int, *args, **kwargs):
         super(MLPRegressor, self).__init__(loss, input_size, output_size, *args, **kwargs)
@@ -162,9 +166,8 @@ class MLPRegressor(MLP):
     def metrics(self):
         return MetricCollection(
             [
-                MulticlassF1Score(num_classes=self.output_size),
-                MulticlassAccuracy(num_classes=self.output_size),
-                MulticlassPrecision(num_classes=self.output_size),
-                MulticlassRecall(num_classes=self.output_size)
+                MeanAbsoluteError(),
+                MeanSquaredError(),
+                MeanAbsolutePercentageError()
             ]
         )

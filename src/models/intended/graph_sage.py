@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from torch_geometric.nn import SAGEConv
 
 from src.interfaces import ModelInterface
-
+from src.utils.constants import ModelType
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARN)
@@ -19,6 +19,7 @@ class GraphSAGE(ModelInterface):
     """GraphSAGE model implemented from https://towardsdatascience.com/pytorch-geometric-graph-embedding-da71d614c3a
     with small changes
     """
+
     def __init__(self,
                  loss: nn.Module,
                  in_channels: int,
@@ -26,9 +27,10 @@ class GraphSAGE(ModelInterface):
                  out_channels: int,
                  n_layers: int,
                  aggr="mean",
-                 device="cpu"
+                 device="cpu",
+                 model_type: ModelType = ModelType.UNSUPERVISED
                  ):
-        super(GraphSAGE, self).__init__(loss=loss, device=device)
+        super(GraphSAGE, self).__init__(loss=loss, device=device, model_type=model_type)
         self.n_layers = n_layers
         self.convs = nn.ModuleList()
         for i in range(n_layers - 1):
@@ -47,6 +49,7 @@ class GraphSAGE(ModelInterface):
         for i, (edge_index, _, size) in enumerate(adjs):
             if self.training:
                 x_target = x[:size[1]]  # Target nodes are always placed first.
+                # TODO check if we always need pass 2 vars, even in inference mode
                 x = self.convs[i]((x, x_target), edge_index)
             else:
                 x = self.convs[i](x, edge_index)
@@ -58,10 +61,10 @@ class GraphSAGE(ModelInterface):
         return x_return
 
     def train_loop(self,
-              x,
-              train_dataloader,
-              optimizer,
-              num_nodes):
+                   x,
+                   train_dataloader,
+                   optimizer,
+                   num_nodes):
         self.train()
         total_loss = 0
 
