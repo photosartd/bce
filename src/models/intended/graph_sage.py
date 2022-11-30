@@ -31,13 +31,17 @@ class GraphSAGE(ModelInterface):
                  model_type: ModelType = ModelType.UNSUPERVISED
                  ):
         super(GraphSAGE, self).__init__(loss=loss, device=device, model_type=model_type)
+        self.in_channels = in_channels
+        self.hid_channels = hid_channels
+        self.out_channels = out_channels
         self.n_layers = n_layers
-        self.convs = nn.ModuleList()
+        self.convs: nn.ModuleList[SAGEConv] = nn.ModuleList()
         for i in range(n_layers - 1):
             in_channels = in_channels if i == 0 else hid_channels
             self.convs.append(SAGEConv(in_channels, hid_channels, aggr=aggr))
         in_channels = in_channels if not len(self.convs) else hid_channels
         self.convs.append(SAGEConv(in_channels, out_channels, aggr=aggr))
+        self.to(self.device)
 
     def forward(self, x, adjs):
         """
@@ -45,6 +49,7 @@ class GraphSAGE(ModelInterface):
         :param adjs: list[(edge_index, e_id, size)]
         :return:
         """
+        x = x.to(self.device)
         """Iterate over adjs"""
         for i, (edge_index, _, size) in enumerate(adjs):
             if self.training:
@@ -64,25 +69,35 @@ class GraphSAGE(ModelInterface):
                    x,
                    train_dataloader,
                    optimizer,
-                   num_nodes):
+                   num_nodes,
+                   optimize=True
+                   ):
         self.train()
         total_loss = 0
+        loss = None
 
         for batch_size, n_id, adjs in train_dataloader:
             # `adjs` holds a list of `(edge_index, e_id, size)` tuples.
             if self.n_layers < 2:
                 adjs = [adjs]
             adjs = [adj.to(self.device) for adj in adjs]
-            optimizer.zero_grad()
+            if optimize:
+                optimizer.zero_grad()
 
             out = self.forward(x[n_id], adjs)
             z_u, z_v, z_vn = out.split(out.size(0) // 3, dim=0)[:3]
-            loss = self.loss(z_u, z_v, z_vn)
-            loss.backward()
-            optimizer.step()
+            current_loss = self.loss(z_u, z_v, z_vn)
+            if optimize:
+                current_loss.backward()
+                optimizer.step()
+            else:
+                if loss is not None:
+                    loss += current_loss
+                else:
+                    loss = current_loss
 
-            total_loss += float(loss.item()) * z_u.size(0)
-        return total_loss / num_nodes
+            total_loss += float(current_loss.item()) * z_u.size(0)
+        return loss, total_loss / num_nodes
 
     @torch.no_grad()
     def predict(self,

@@ -4,6 +4,7 @@ from typing import Literal
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn.parameter import Parameter
 
 from src.containers import WeightsContainer
 
@@ -41,7 +42,9 @@ class LinearBackwardTransformation(nn.Module):
         self.M = M
         self.N = N
         self.no_trans = no_trans
-        self.W = torch.eye(max(M, N), requires_grad=True)[:M, :N] if no_trans else torch.randn((M, N), requires_grad=True)
+        self.W = Parameter(torch.eye(max(M, N), requires_grad=True)[:M, :N],
+                           requires_grad=True) if no_trans else Parameter(torch.randn((M, N), requires_grad=True),
+                                                                          requires_grad=True)
 
     def forward(self, m: torch.Tensor):
         """Linear transformation W x m"""
@@ -62,6 +65,7 @@ class AlignmentLoss(nn.Module):
         """
         super(AlignmentLoss, self).__init__()
         self.lambda_: float = lambda_
+        self.all_backward_transformations: nn.ModuleList = nn.ModuleList()
         self.backward_transformation_type = backward_transformation
         self.backward_transformation: BackwardTransformation = BackwardTransformation(self.backward_transformation_type,
                                                                                       **kwargs)
@@ -87,9 +91,9 @@ class AlignmentLoss(nn.Module):
             :param kwargs: M, N for BackwardTransformation
             :return: None
         """
-        if self.alignment_type == "single_step":
-            return
         self.alignment.append(self.backward_transformation)
+        if self.alignment_type == "multi_step":
+            self.all_backward_transformations.append(self.backward_transformation)
         self.backward_transformation = BackwardTransformation(self.backward_transformation_type, **kwargs)
 
 
@@ -99,7 +103,6 @@ class Alignment(nn.Module, ABC):
         raise NotImplementedError()
 
 
-# TODO: implement different alignments
 class SingleStepAlignment(Alignment):
     """Single step alignment as discussed in https://arxiv.org/pdf/2206.03040.pdf.
     Also called JointLinS[Loss]
@@ -156,5 +159,4 @@ class MultiStepAlignment(Alignment):
         return alignment_loss / k
 
     def append(self, backward_transformation: BackwardTransformation, **kwargs):
-        # TODO not extendable, need to be edited
         self.w_all.append(backward_transformation.backward_transformation.W)
