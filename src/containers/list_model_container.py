@@ -8,7 +8,7 @@ from src.interfaces.container_interface import ContainerInterface
 class ListModelContainer(ContainerInterface):
     """Container with models stored in list"""
 
-    def __init__(self, models: List[ModelInterface], **kwargs):
+    def __init__(self, models: List[ModelInterface] = [], **kwargs):
         super(ListModelContainer, self).__init__(models, **kwargs)
         assert isinstance(self.models, list), "models argument was not list"
 

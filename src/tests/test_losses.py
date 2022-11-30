@@ -1,9 +1,16 @@
 import unittest
+import logging
 
 import torch
 import torch.nn.functional as F
 
 from src.losses import BackwardTransformation, AlignmentLoss, MultiStepAlignment
+
+
+logger = logging.getLogger("TestAlignment")
+logger.setLevel(logging.INFO)
+logging.basicConfig()
+
 
 """Variables"""
 """BackwardTransformation"""
@@ -50,9 +57,11 @@ class TestAlignmentLoss(unittest.TestCase):
         loss_hands = LAMBDA * F.mse_loss(torch.matmul(m, loss.backward_transformation.backward_transformation.W), m_k_1)
         self.assertTrue(torch.all(loss_hands == l).item())
         # 3. Check finish works as expected
-        loss.finish()
+        self.assertTrue(len(list(loss.parameters())) == 1)
+        loss.finish(M=M, N=N)
+        self.assertTrue(len(list(loss.parameters())) == 1)
         new_loss = loss(m, m_k_1)
-        self.assertTrue(torch.all(new_loss == l).item())
+        self.assertFalse(torch.all(new_loss == l).item())
 
     def test_alignment_no_trans_single_step(self):
         loss = AlignmentLoss(
@@ -70,9 +79,13 @@ class TestAlignmentLoss(unittest.TestCase):
         loss_hands = LAMBDA * F.mse_loss(torch.matmul(m, torch.eye(max(M, N))[:M, :N]), m_k_1)
         self.assertTrue(torch.all(loss_hands == l).item())
         # 3. Check finish works as expected
-        loss.finish()
+        self.assertTrue(len(list(loss.parameters())) == 1)
+        loss.finish(M=M, N=N)
+        self.assertTrue(len(list(loss.parameters())) == 1)
         new_loss = loss(m, m_k_1)
         self.assertTrue(torch.all(new_loss == l).item())
+        # 4. Check len of all backward transformations didn't changed
+        self.assertTrue(len(loss.all_backward_transformations) == 0)
 
     def test_alignment_linear_multi_step(self):
         loss = AlignmentLoss(
@@ -82,6 +95,7 @@ class TestAlignmentLoss(unittest.TestCase):
             N=N,
             M=M
         )
+        NEW_N = 128
         m_k_1 = torch.rand((BATCH_SIZE, N))
         l = loss(m, m_k_1)
         # 1. Check shape
@@ -92,16 +106,21 @@ class TestAlignmentLoss(unittest.TestCase):
             torch.zeros((BATCH_SIZE, N))) / 1
         self.assertTrue(torch.all(loss_hands == l).item())
         # 3. Check values: 2 step alignment
-        NEW_N = 128
         m_k1 = torch.rand((BATCH_SIZE, NEW_N))
+        self.assertTrue(len(list(loss.parameters())) == 1)
+        logger.info(f"Multi_step alignment parameters(len={len(list(loss.parameters()))}) before .finish()")
         loss.finish(M=NEW_N, N=M)
-        # 4. Assert weights container size
+        self.assertTrue(len(list(loss.parameters())) == 2)
+        logger.info(f"Multi_step alignment parameters(len={len(list(loss.parameters()))}) after .finish()")
+        # 4. Check len of all backward transformations == 1
+        self.assertTrue(len(loss.all_backward_transformations) == 1)
+        # 5. Assert weights container size
         if isinstance(loss.alignment, MultiStepAlignment):
             self.assertEqual(len(loss.alignment.w_all), 1)
         l_new = loss(m_k1, m)
-        # 5. Check shape new
+        # 6. Check shape new
         self.assertEqual(l_new.shape, ())
-        # 6. Check hands loss
+        # 7. Check hands loss
         delta = torch.matmul(
             m_k1,
             loss.backward_transformation.backward_transformation.W

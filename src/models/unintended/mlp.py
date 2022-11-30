@@ -39,7 +39,8 @@ class MLP(ModelInterface, ABC):
             input_size,
             output_size,
             div
-        ).to(self.device)
+        )
+        self.to(self.device)
 
     @staticmethod
     def _init_mlp(input_size: int,

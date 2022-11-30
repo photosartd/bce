@@ -1,2 +1,2 @@
 from .intended import GraphSAGE
-from .unintended import MLPClassifier, MLPRegressor
+from .unintended import MLPClassifier, MLPRegressor, MLP
