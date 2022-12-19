@@ -1,1 +1,1 @@
-from .two_stage_trainer import GraphSAGETwoStageTrainer
+from .gs_alignment_trainer import GSAlignmentTrainer

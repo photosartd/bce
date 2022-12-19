@@ -1,106 +1,20 @@
 import logging
-import pickle as pkl
 import os.path
 import pickle as pkl
-from typing import List, Dict, Union, Tuple, Callable
+from typing import List, Dict, Union, Tuple
 from abc import ABC, abstractmethod
 
 import wandb
 import torch.optim
-from torch.utils.data import DataLoader
-from tqdm import tqdm
 
-from src.dataclasses import Optimizers, Losses, Models
+
 from src.interfaces import Saveable, ModelInterface
 from src.utils.datasets import TensorDataset
 from src.containers import ListModelContainer
 from src.losses import AlignmentLoss
 
 
-class TrainerInterface(ABC):
-    """Abstract class created for easy training of models
-    Parameters should be prepared in setup stage
-    Parameters:
-        :param dataloaders: list of train, val, test dataloaders
-        :param optimizers: optimizers for different tasks
-        :param losses: losses for different tasks
-        :param models: models (of subtype ModelInterface)
-        :param device: where to train nets
-        :param logger: logging.Logger
-    """
-    dataloaders: List[DataLoader]
-    optimizers: Optimizers
-    losses: Losses
-    models: Models
-    logger: logging.Logger
-    device: torch._C.device = "cuda" if torch.cuda.is_available() else "cpu"
-
-    def __init__(self, *args, **kwargs):
-        self.setup_logger()
-        self.logger = logging.getLogger("default_logger")
-        self.kwargs = kwargs
-
-    def setup(self, **kwargs) -> None:
-        """Implement all basic operations that are needed
-        Arguments:
-            :param kwargs: any keyword arguments you want to supply to 'configure_*' methods
-            :return: None
-        """
-        self.models = self.configure_models(**kwargs)
-        self.optimizers = self.configure_optimizers(**kwargs)
-        self.losses = self.configure_losses(**kwargs)
-
-    @staticmethod
-    def setup_logger(name="default_logger", level=logging.WARN, **kwargs) -> None:
-        logger = logging.getLogger(name)
-        logger.setLevel(level)
-        logging.basicConfig()
-
-    @abstractmethod
-    def fit(self, **kwargs):
-        """Fit method. Must implement all basic steps in abstract form
-        Arguments:
-            :param kwargs:
-            :return:
-        """
-        raise NotImplementedError()
-
-    @abstractmethod
-    def log_metrics(self, **kwargs):
-        """Make all needed logging"""
-        raise NotImplementedError()
-
-    @abstractmethod
-    def configure_models(self, **kwargs) -> Models:
-        """Returns src.dataclasses.Models"""
-        raise NotImplementedError()
-
-    @abstractmethod
-    def configure_dataloaders(self, **kwargs) -> List[DataLoader]:
-        """Returns dataloader for task
-        Arguments:
-            :return: List[torch.util.data.DataLoader] - [train, val, test] (None for every if there is no)
-        """
-        raise NotImplementedError()
-
-    def configure_optimizers(self, lr: float = 3e-4, weight_decay: float = 4e-5, **kwargs) -> Optimizers:
-        """Returns src.dataclasses.Optimizers"""
-        intended_optimizers = [torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
-                               for model in self.models.intended_models]
-        unintended_optimizers = [torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
-                                 for model in self.models.unintended_models]
-        return Optimizers(intended_optimizers, unintended_optimizers)
-
-    def configure_losses(self, **kwargs) -> Losses:
-        """Returns src.dataclasses.Losses"""
-        intended_losses = [losses for losses in
-                           map(lambda x: x.loss if isinstance(x.loss, list) else [x.loss], self.models.intended_models)]
-        unintended_losses = [losses for losses in map(lambda x: x.loss if isinstance(x.loss, list) else [x.loss],
-                                                      self.models.unintended_models)]
-        return Losses(intended_losses, unintended_losses)
-
-
-class TrainerInterfaceNew(Saveable, ABC):
+class TrainerInterface(Saveable, ABC):
     """Abstract class created for easy training of models
         Implements template method `train`
         Implements template method `replace_model`
@@ -182,7 +96,7 @@ class TrainerInterfaceNew(Saveable, ABC):
         return cls(model=models, **old_kwargs)
 
 
-class AlignmentTrainerInterface(TrainerInterfaceNew, ABC):
+class AlignmentTrainerInterface(TrainerInterface, ABC):
     alignment: AlignmentLoss
     alignment_optimizer: torch.optim.Optimizer
     current_model: ModelInterface
@@ -211,7 +125,7 @@ class AlignmentTrainerInterface(TrainerInterfaceNew, ABC):
         for metric_name, metric_val in metrics.items():
             self.logger.info(f"Epoch: {epoch}| Metric {metric_name}: {metric_val}")
 
-    def configure_models(self, model: Union[ModelInterface, Models] = None, **kwargs) -> ListModelContainer:
+    def configure_models(self, model: Union[ModelInterface, ListModelContainer] = None, **kwargs) -> ListModelContainer:
         if isinstance(model, ListModelContainer):
             model.models = [m.to(self.device) for m in model.models]
             return model
@@ -219,7 +133,7 @@ class AlignmentTrainerInterface(TrainerInterfaceNew, ABC):
             model = model.to(self.device)
             return ListModelContainer([model])
         else:
-            raise TypeError("Model must be of of type Union[ModelInterface, Models]")
+            raise TypeError("Model must be of of type Union[ModelInterface, ListModelContainer]")
 
     def configure_alignment(self, lambda_=4, alignment="single_step", backward_transformation="linear",
                             alignment_loss: AlignmentLoss = None, **kwargs):
