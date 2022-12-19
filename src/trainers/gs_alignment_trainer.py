@@ -103,8 +103,8 @@ class GSAlignmentTrainer(AlignmentTrainerInterface):
                    self.current_model.in_channels == other.current_model.in_channels and \
                    self.current_model.hid_channels == other.current_model.hid_channels and \
                    self.current_model.out_channels == other.current_model.out_channels and \
-                   len(self.alignment.all_backward_transformations) == len(
-                other.alignment.all_backward_transformations) and \
+                   len(self.alignment.alignment.all_backward_transformations) == len(
+                other.alignment.alignment.all_backward_transformations) and \
                    self.prev_embeddings.x == other.prev_embeddings.x
         else:
             raise NotImplementedError()

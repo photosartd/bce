@@ -17,7 +17,7 @@ from src.utils.datasets import TensorSupervisedDataset
 from src.trainers.gs_alignment_trainer import GSAlignmentTrainer
 
 KWARGS = {
-    "lambda_": 8,
+    "lambda_": 2,
     "alignment": "multi_step",
     "backward_transformation": "linear",
     "level": logging.INFO,
@@ -56,7 +56,7 @@ class TestGSAlignmentTrainer(unittest.TestCase):
         )
         self.assertTrue(model1 == trainer.current_model)
         self.assertTrue(len(trainer.models) == 1)
-        self.assertTrue(len(trainer.alignment.all_backward_transformations) == 0)
+        self.assertTrue(len(trainer.alignment.alignment.all_backward_transformations) == 0)
 
     def test_can_replace_model(self):
         trainer = GSAlignmentTrainer(
@@ -66,7 +66,7 @@ class TestGSAlignmentTrainer(unittest.TestCase):
         trainer.replace_model(model2)
         self.assertTrue(model2 == trainer.current_model)
         self.assertTrue(len(trainer.models) == 2)
-        self.assertTrue(len(trainer.alignment.all_backward_transformations) == 1)
+        self.assertTrue(len(trainer.alignment.alignment.all_backward_transformations) == 1)
 
     def test_can_save_and_load(self):
         trainer = GSAlignmentTrainer(
@@ -237,36 +237,51 @@ class TestGSAlignmentTrainer(unittest.TestCase):
             trainer.log_metrics(epoch, statistics)
         self.check_strictly_decreasing_trend(losses)
         """Get predictions for latest snapshot"""
-        predictions, stats = trainer.inference(
-            train_dataset[-1],
-            walk_length=3,
-            sizes=(5, 2),
-            batch_size=256,
-            shuffle=False,
-            log_stats=False
-        )
-        predictions_test, stats_test = trainer.inference(
-            test_dataset[0],
-            walk_length=3,
-            sizes=(5, 2),
-            batch_size=256,
-            shuffle=False,
-            log_stats=False
-        )
+        predictions = []
+        ys = []
+        for data in train_dataset:
+            curr_predictions, stats = trainer.inference(
+                data,
+                walk_length=3,
+                sizes=(5, 2),
+                batch_size=256,
+                shuffle=False,
+                log_stats=False
+            )
+            predictions.append(curr_predictions)
+            ys.append(data.y)
+        predictions = torch.vstack(predictions)
+        ys = torch.hstack(ys)
+
+        predictions_test = []
+        ys_test = []
+        for data in test_dataset:
+            curr_predictions_test, stats_test = trainer.inference(
+                data,
+                walk_length=3,
+                sizes=(5, 2),
+                batch_size=256,
+                shuffle=False,
+                log_stats=False
+            )
+            predictions_test.append(curr_predictions_test)
+            ys_test.append(data.y)
+        predictions_test = torch.vstack(predictions_test)
+        ys_test = torch.hstack(ys_test)
         """Training unintended"""
         unintended_dataset = TensorSupervisedDataset(
             x=predictions,
-            y=train_dataset[-1].y
+            y=ys
         )
         unintended_dataloader = DataLoader(unintended_dataset, batch_size=256, shuffle=False)
 
         unintended_dataset_val = TensorSupervisedDataset(
             x=predictions_test,
-            y=test_dataset[0].y
+            y=ys_test
         )
         unintended_dataloader_val = DataLoader(unintended_dataset_val, batch_size=256, shuffle=False)
         unintended_losses = []
-        for epoch in range(1, N_EPOCHS + 97):
+        for epoch in range(1, N_EPOCHS + 15):
             loss, metrics = unintended_model.train_loop(unintended_dataloader, unintended_opt)
             preds_val, metrics_val = unintended_model.predict(unintended_dataloader_val)
             trainer.log_metrics(
@@ -305,7 +320,7 @@ class TestGSAlignmentTrainer(unittest.TestCase):
         )
         """Train intended again"""
         losses = []
-        scheduler = torch.optim.lr_scheduler.StepLR(trainer.alignment_optimizer, step_size=5, gamma=0.1)
+        scheduler = torch.optim.lr_scheduler.StepLR(trainer.alignment_optimizer, step_size=50, gamma=0.1)
         for epoch in range(1, N_EPOCHS + 70):
             loss2 = 0
             time: int = 1
@@ -328,17 +343,25 @@ class TestGSAlignmentTrainer(unittest.TestCase):
             optimizer.zero_grad()
 
             """Get preds on step"""
-            predictions_test, stats_test = trainer.inference(
-                test_dataset[0],
-                walk_length=3,
-                sizes=(5, 2, 1),
-                batch_size=256,
-                shuffle=False,
-                log_stats=False
-            )
+            predictions_test = []
+            ys_test = []
+            for data in test_dataset:
+                curr_predictions_test, stats_test = trainer.inference(
+                    data,
+                    walk_length=3,
+                    sizes=(5, 2, 1),
+                    batch_size=256,
+                    shuffle=False,
+                    log_stats=False
+                )
+                predictions_test.append(curr_predictions_test)
+                ys_test.append(data.y)
+            predictions_test = torch.vstack(predictions_test)
+            ys_test = torch.hstack(ys_test)
+
             unintended_dataset_val = TensorSupervisedDataset(
                 x=predictions_test,
-                y=test_dataset[0].y
+                y=ys_test
             )
             unintended_dataloader_val = DataLoader(unintended_dataset_val, batch_size=256, shuffle=False)
             preds_val, metrics_val = unintended_model.predict(unintended_dataloader_val)

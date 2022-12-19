@@ -7,8 +7,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 
-from src.containers import WeightsContainer
-
 
 class GraphSageLoss(nn.Module):
     def forward(self, z_u: torch.Tensor,
@@ -47,13 +45,15 @@ class LinearBackwardTransformation(nn.Module):
         self.M = M
         self.N = N
         self.no_trans = no_trans
-        self.W = Parameter(torch.eye(max(M, N), requires_grad=True)[:M, :N],
-                           requires_grad=True) if no_trans else Parameter(torch.randn((M, N), requires_grad=True),
-                                                                          requires_grad=True)
+        self.transformation = Parameter(torch.eye(max(M, N), requires_grad=True)[:M, :N],
+                                        requires_grad=True) if no_trans else nn.Linear(M, N)
 
     def forward(self, m: torch.Tensor):
         """Linear transformation W x m"""
-        return torch.matmul(m, self.W)
+        if self.no_trans:
+            return torch.matmul(m, self.transformation)
+        else:
+            return self.transformation(m)
 
 
 class AlignmentLoss(nn.Module):
@@ -70,7 +70,6 @@ class AlignmentLoss(nn.Module):
         """
         super(AlignmentLoss, self).__init__()
         self.lambda_: float = lambda_
-        self.all_backward_transformations: nn.ModuleList = nn.ModuleList()
         self.backward_transformation_type = backward_transformation
         self.backward_transformation: BackwardTransformation = BackwardTransformation(self.backward_transformation_type,
                                                                                       **kwargs)
@@ -93,11 +92,7 @@ class AlignmentLoss(nn.Module):
             :param m_k: tensor with new embeddings space
             :param ver: embedding space version; -1 means only self.backward_transformation will be used
         """
-        return reduce(
-            lambda m_curr, bt: bt.inference(m_curr),
-            self.all_backward_transformations[:ver:-1],
-            self.backward_transformation.inference(m_k)
-        )
+        return m_k if ver == 0 else self.alignment.inference(bm_k=self.backward_transformation.inference(m_k), ver=ver)
 
     def finish(self, **kwargs) -> None:
         """Finish epoch of M_k, M_k_1. **kwargs must include kwargs for BackwardTransformation
@@ -110,8 +105,6 @@ class AlignmentLoss(nn.Module):
             :return: None
         """
         self.alignment.append(self.backward_transformation)
-        if self.alignment_type == "multi_step":
-            self.all_backward_transformations.append(self.backward_transformation)
         self.backward_transformation = BackwardTransformation(self.backward_transformation_type, **kwargs)
 
 
@@ -119,6 +112,10 @@ class Alignment(nn.Module, ABC):
     @abstractmethod
     def append(self, backward_transformation: BackwardTransformation, **kwargs):
         raise NotImplementedError()
+
+    def inference(self, bm_k: torch.Tensor, ver: int = -1, *args, **kwargs):
+        """Calls inference in inner backward transformation if necessary"""
+        return bm_k
 
 
 class SingleStepAlignment(Alignment):
@@ -147,14 +144,15 @@ class MultiStepAlignment(Alignment):
     Also called JointLinM[Loss]
     """
 
-    def __init__(self, w_all: WeightsContainer = None, **kwargs):
+    def __init__(self, all_backward_transformations: nn.ModuleList = None, **kwargs):
         """
         Arguments:
             :param w_all: weights of M_{1..k-1}
             :param kwargs:
         """
         super(MultiStepAlignment, self).__init__()
-        self.w_all: WeightsContainer = w_all if w_all is not None else WeightsContainer()
+        self.all_backward_transformations: nn.ModuleList = all_backward_transformations if \
+            all_backward_transformations is not None else nn.ModuleList()
 
     def forward(self, bm_k: torch.Tensor, m_k_1: torch.Tensor):
         """
@@ -164,17 +162,29 @@ class MultiStepAlignment(Alignment):
 
             :return: mse between them
         """
-        # IMPORTANT: bm_k has already been transformed with w_all[-1]
+        # IMPORTANT: bm_k has already been transformed with all_backward_transformations[-1]
         delta = (bm_k - m_k_1)
         last_term = F.mse_loss(delta, torch.zeros(delta.shape), reduction="sum")
         losses = [last_term]
-        for i in range(-1, -(len(self.w_all) + 1), -1):
-            current_term = torch.matmul(delta, self.w_all[i:])
+        for i in range(-1, -(len(self.all_backward_transformations) + 1), -1):
+            current_term = reduce(
+                lambda tensor, module: module(tensor),
+                reversed(self.all_backward_transformations[i:]),
+                delta
+            )
             current_term = F.mse_loss(current_term, torch.zeros(current_term.shape), reduction="sum")
             losses.append(current_term)
         alignment_loss = sum(losses)
-        k = len(self.w_all) + 1
+        k = len(self.all_backward_transformations) + 1
         return alignment_loss / k
 
+    def inference(self, bm_k: torch.Tensor, ver: int = -1, *args, **kwargs):
+        """Makes inference on input backward transformed tensor sequentially"""
+        return reduce(
+            lambda m_curr, bt: bt.inference(m_curr),
+            self.all_backward_transformations[:ver:-1],
+            bm_k
+        )
+
     def append(self, backward_transformation: BackwardTransformation, **kwargs):
-        self.w_all.append(backward_transformation.backward_transformation.W)
+        self.all_backward_transformations.append(backward_transformation.backward_transformation.transformation)
