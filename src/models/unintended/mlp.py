@@ -1,7 +1,7 @@
 import logging
 from abc import ABC
 from collections import OrderedDict
-from typing import List, Tuple
+from typing import List, Tuple, Union, Dict, Any
 from functools import cached_property
 
 import numpy as np
@@ -67,11 +67,17 @@ class MLP(ModelInterface, ABC):
     def train_loop(self,
                    train_dataloader: torch.utils.data.DataLoader,
                    optimizer
-                   ):
+                   ) -> \
+            Tuple[
+                Union[torch.Tensor, None],
+                Dict[str, Any]
+            ]:
         self.train()
         total_loss = 0
+        index: int = 0
 
         for (x, y) in train_dataloader:
+            index += 1
             x = x.to(self.device)
             y = y.to(self.device)
             optimizer.zero_grad()
@@ -88,18 +94,22 @@ class MLP(ModelInterface, ABC):
             logger.info(f"Metrics: {metric}")
 
         metrics = self.metrics.compute()
+        metrics["mean_train_loss"] = total_loss / index
 
-        return total_loss, metrics
+        return None, metrics
 
     @torch.no_grad()
     def predict(self,
                 test_dataloader: torch.utils.data.DataLoader,
                 compute_metrics: bool = True
-                ):
+                ) -> \
+            Tuple[
+                Union[torch.Tensor, None],
+                Dict[str, Any]
+            ]:
         self.eval()
         losses: List[float] = []
-        predictions: List[torch.Tensor] = []
-        mean_loss = None
+        predictions = []
         metrics = None
 
         for (x, y) in test_dataloader:
@@ -126,11 +136,12 @@ class MLP(ModelInterface, ABC):
         if compute_metrics:
             mean_loss = np.mean(losses)
             metrics = self.metrics.compute()
+            metrics["mean_loss"] = mean_loss
             logger.info(f"Predict mean loss: {mean_loss}")
             logger.info(f"Predict metrics: {metrics}")
         self.metrics.reset()
 
-        return predictions, mean_loss, metrics
+        return predictions, metrics
 
 
 class MLPClassifier(MLP):
@@ -168,7 +179,6 @@ class MLPRegressor(MLP):
         return MetricCollection(
             [
                 MeanAbsoluteError(),
-                MeanSquaredError(),
-                MeanAbsolutePercentageError()
+                MeanSquaredError()
             ]
         )

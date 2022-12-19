@@ -54,7 +54,8 @@ class TestAlignmentLoss(unittest.TestCase):
         # 1. Check shape
         self.assertEqual(l.shape, ())
         # 2. Check values
-        loss_hands = LAMBDA * F.mse_loss(torch.matmul(m, loss.backward_transformation.backward_transformation.W), m_k_1)
+        loss_hands = LAMBDA * F.mse_loss(torch.matmul(m, loss.backward_transformation.backward_transformation.W), m_k_1,
+                                         reduction="sum")
         self.assertTrue(torch.all(loss_hands == l).item())
         # 3. Check finish works as expected
         self.assertTrue(len(list(loss.parameters())) == 1)
@@ -76,7 +77,8 @@ class TestAlignmentLoss(unittest.TestCase):
         # 1. Check shape
         self.assertEqual(l.shape, ())
         # 2. Check values
-        loss_hands = LAMBDA * F.mse_loss(torch.matmul(m, torch.eye(max(M, N))[:M, :N]), m_k_1)
+        loss_hands = LAMBDA * F.mse_loss(torch.matmul(m, torch.eye(max(M, N))[:M, :N]), m_k_1,
+                                         reduction="sum")
         self.assertTrue(torch.all(loss_hands == l).item())
         # 3. Check finish works as expected
         self.assertTrue(len(list(loss.parameters())) == 1)
@@ -103,7 +105,7 @@ class TestAlignmentLoss(unittest.TestCase):
         # 2. Check values: 1 step alignment
         loss_hands = LAMBDA * F.mse_loss(
             (torch.matmul(m, loss.backward_transformation.backward_transformation.W) - m_k_1),
-            torch.zeros((BATCH_SIZE, N))) / 1
+            torch.zeros((BATCH_SIZE, N)), reduction="sum") / 1
         self.assertTrue(torch.all(loss_hands == l).item())
         # 3. Check values: 2 step alignment
         m_k1 = torch.rand((BATCH_SIZE, NEW_N))
@@ -127,8 +129,8 @@ class TestAlignmentLoss(unittest.TestCase):
         ) - m
         second_term = torch.matmul(delta, loss.alignment.w_all[-1:])
         loss_hands_new = LAMBDA * sum(
-            [F.mse_loss(delta, torch.zeros(delta.shape)),
-            F.mse_loss(second_term, torch.zeros(second_term.shape))]
+            [F.mse_loss(delta, torch.zeros(delta.shape), reduction="sum"),
+            F.mse_loss(second_term, torch.zeros(second_term.shape), reduction="sum")]
         ) / 2
         self.assertTrue(torch.all(l_new == loss_hands_new).item())
 

@@ -15,7 +15,8 @@ from src.models import GraphSAGE, MLPRegressor, MLP
 from src.dataclasses import Models
 from src.utils import PositiveNegativeNeighbourSampler, seed
 from src.utils.datasets import TensorSupervisedDataset, TensorDataset
-from src.interfaces import TrainerInterface, ModelInterface
+from src.interfaces import ModelInterface
+from src.interfaces.trainer_interface import TrainerInterface
 from src.losses import GraphSageLoss, AlignmentLoss
 
 
@@ -53,6 +54,56 @@ class GraphSAGETwoStageTrainer(TwoStageTrainer):
         self.walk_length: int = walk_length
         self.batch_size: int = batch_size
         self.sizes: List[int] = kwargs["sizes"]  # Throws exception is not given
+
+    def __fit_partial(self,
+                      intended_model: ModelInterface,
+                      num_epochs: int,
+                      model_index: int,
+                      main_loss: nn.Module,
+                      alignment_loss_fn: AlignmentLoss,
+                      datasets,
+                      disable_progress=True
+                      ):
+        loss: Union[torch.Tensor, int] = 0
+        loss_align: Union[torch.Tensor, int] = 0
+        step = 0
+        loss_train_gs = 0
+        loss_train_align = 0
+
+        def train_step(dataloader, train_data):
+            intended_model.train()
+            losses_gs_train = []
+            losses_align_train = []
+            for batch_id, (batch_size, n_id, adjs) in enumerate(dataloader):
+                if intended_model.n_layers < 2:
+                    adjs = [adjs.to(self.device)]
+                adjs = [adj.to(self.device) for adj in adjs]
+                out = intended_model.forward(train_data.x[n_id], adjs)
+                z_u, z_v, z_vn = out.split(out.size(0) // 3, dim=0)[:3]
+
+                loss_curr_gsl = main_loss(z_u, z_v, z_vn)
+                loss += loss_curr_gsl
+                alignment_loss = self.get_alignment_loss(z_u, n_id, alignment_loss_fn, model_index)
+                loss_align += alignment_loss
+                losses_gs_train.append(float(loss_curr_gsl.item()) * z_u.size(0))
+                losses_align_train.append(alignment_loss.item())
+                step += 1
+
+
+        self.initialize_intended_model(intended_model, model_index)
+        """3. For epochs"""
+        for epoch in tqdm(range(num_epochs), disable=disable_progress):
+            loss: Union[torch.Tensor, int] = 0
+            loss_align: Union[torch.Tensor, int] = 0
+            step = 0
+            loss_train_gs = 0
+            loss_train_align = 0
+            """4. Train on snapshots (0:timestamp + one_model_snapshots_len)"""
+            for data in datasets:
+                dataloaders, data_objects = self.get_dataloaders(data, sizes=self.sizes)
+                train_dataloader, val_dataloader, test_dataloader = dataloaders
+
+
 
     def fit(self, num_epochs=20, disable_progress=True, **kwargs):
         super(GraphSAGETwoStageTrainer, self).fit(num_epochs=num_epochs, **kwargs)
@@ -166,42 +217,45 @@ class GraphSAGETwoStageTrainer(TwoStageTrainer):
 
     def configure_models(self, models: Models = None, lambda_=4, alignment="single_step", backward_transformation="linear", n_layers=2,
                          out_channels=32, lags=8, target_size=1, div=3, **kwargs) -> Models:
-        if models is not None:
+        if isinstance(models, Models):
             return models
-        alignment_loss = AlignmentLoss(
-            lambda_=lambda_,
-            backward_transformation=backward_transformation,
-            alignment=alignment,
-            M=out_channels,
-            N=out_channels
-        )
-        intended_model_1 = GraphSAGE(
-            loss=[GraphSageLoss(), alignment_loss],
-            in_channels=lags,
-            hid_channels=64,
-            out_channels=out_channels,
-            n_layers=n_layers,
-            device=self.device
-        )
-        intended_model_2 = GraphSAGE(
-            loss=[GraphSageLoss(), alignment_loss],
-            in_channels=lags,
-            hid_channels=128,
-            out_channels=out_channels,
-            n_layers=n_layers,
-            device=self.device
-        )
-        unintended_model = MLPRegressor(
-            loss=nn.MSELoss(),
-            input_size=out_channels,
-            output_size=target_size,
-            div=div,
-            device=self.device
-        )
-        return Models(
-            [intended_model_1, intended_model_2],
-            [unintended_model]
-        )
+        elif models is not None:
+            alignment_loss = AlignmentLoss(
+                lambda_=lambda_,
+                backward_transformation=backward_transformation,
+                alignment=alignment,
+                M=out_channels,
+                N=out_channels
+            )
+            intended_model_1 = GraphSAGE(
+                loss=[GraphSageLoss(), alignment_loss],
+                in_channels=lags,
+                hid_channels=64,
+                out_channels=out_channels,
+                n_layers=n_layers,
+                device=self.device
+            )
+            intended_model_2 = GraphSAGE(
+                loss=[GraphSageLoss(), alignment_loss],
+                in_channels=lags,
+                hid_channels=128,
+                out_channels=out_channels,
+                n_layers=n_layers,
+                device=self.device
+            )
+            unintended_model = MLPRegressor(
+                loss=nn.MSELoss(),
+                input_size=out_channels,
+                output_size=target_size,
+                div=div,
+                device=self.device
+            )
+            return Models(
+                [intended_model_1, intended_model_2],
+                [unintended_model]
+            )
+        else:
+            raise TypeError("models must be of type Models")
 
     def get_dataloaders(self, data, sizes, **kwargs):
         self.dataloaders = self.configure_dataloaders(data, sizes, **kwargs)

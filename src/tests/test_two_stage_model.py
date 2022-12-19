@@ -25,7 +25,7 @@ model = GraphSAGETwoStageTrainer(**kwargs)
 
 
 class TestGraphSAGETwoStageTrainer(unittest.TestCase):
-    #@unittest.skip("Skipped model training test")
+    @unittest.skip("Skipped model training test")
     def test_fit_works(self):
         model.fit(
             num_epochs=30,

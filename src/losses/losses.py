@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Literal
+from functools import reduce
 
 import torch
 import torch.nn as nn
@@ -27,6 +28,10 @@ class BackwardTransformation(nn.Module):
 
     def forward(self, m: torch.Tensor):
         return self.backward_transformation(m)
+
+    @torch.no_grad()
+    def inference(self, m_k: torch.Tensor):
+        return self.backward_transformation(m_k)
 
 
 class LinearBackwardTransformation(nn.Module):
@@ -81,6 +86,19 @@ class AlignmentLoss(nn.Module):
         """
         return self.lambda_ * self.alignment(self.backward_transformation(m_k), m_k_1)
 
+    @torch.no_grad()
+    def inference(self, m_k: torch.Tensor, ver: int = -1):
+        """Calculation m_k_j
+        Arguments:
+            :param m_k: tensor with new embeddings space
+            :param ver: embedding space version; -1 means only self.backward_transformation will be used
+        """
+        return reduce(
+            lambda m_curr, bt: bt.inference(m_curr),
+            self.all_backward_transformations[:ver:-1],
+            self.backward_transformation.inference(m_k)
+        )
+
     def finish(self, **kwargs) -> None:
         """Finish epoch of M_k, M_k_1. **kwargs must include kwargs for BackwardTransformation
         (in case of MultiStepLoss).
@@ -118,7 +136,7 @@ class SingleStepAlignment(Alignment):
             :param m_k_1: EmbeddingSpace of M_{k - 1}
             :return: mse between them
         """
-        return F.mse_loss(bm_k, m_k_1)
+        return F.mse_loss(bm_k, m_k_1, reduction="sum")
 
     def append(self, backward_transformation: BackwardTransformation, **kwargs):
         pass
@@ -148,11 +166,11 @@ class MultiStepAlignment(Alignment):
         """
         # IMPORTANT: bm_k has already been transformed with w_all[-1]
         delta = (bm_k - m_k_1)
-        last_term = F.mse_loss(delta, torch.zeros(delta.shape))
+        last_term = F.mse_loss(delta, torch.zeros(delta.shape), reduction="sum")
         losses = [last_term]
         for i in range(-1, -(len(self.w_all) + 1), -1):
             current_term = torch.matmul(delta, self.w_all[i:])
-            current_term = F.mse_loss(current_term, torch.zeros(current_term.shape))
+            current_term = F.mse_loss(current_term, torch.zeros(current_term.shape), reduction="sum")
             losses.append(current_term)
         alignment_loss = sum(losses)
         k = len(self.w_all) + 1
