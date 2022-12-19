@@ -10,10 +10,10 @@ from torch_geometric_temporal.dataset import ChickenpoxDatasetLoader, WikiMathsD
 from torch_geometric_temporal.signal import temporal_signal_split
 import wandb
 
-from src.models import GraphSAGE, MLPClassifier, MLPRegressor
-from src.utils import PositiveNegativeNeighbourSampler
-from src.utils.datasets import TensorSupervisedDataset
-from src.losses import GraphSageLoss
+from torch_bce.models import GraphSAGE, MLPClassifier, MLPRegressor
+from torch_bce.utils import PositiveNegativeNeighbourSampler
+from torch_bce.utils.datasets import TensorSupervisedDataset
+from torch_bce.losses import GraphSageLoss
 
 
 logger = logging.getLogger("bce")

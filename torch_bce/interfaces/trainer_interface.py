@@ -8,10 +8,10 @@ import wandb
 import torch.optim
 
 
-from src.interfaces import Saveable, ModelInterface
-from src.utils.datasets import TensorDataset
-from src.containers import ListModelContainer
-from src.losses import AlignmentLoss
+from torch_bce.interfaces import Saveable, ModelInterface
+from torch_bce.utils.datasets import TensorDataset
+from torch_bce.containers import ListModelContainer
+from torch_bce.losses import AlignmentLoss
 
 
 class TrainerInterface(Saveable, ABC):
@@ -56,7 +56,7 @@ class TrainerInterface(Saveable, ABC):
     @staticmethod
     @abstractmethod
     def configure_models(**kwargs) -> ListModelContainer:
-        """Returns src.containers.ListModelContainer"""
+        """Returns torch_bce.containers.ListModelContainer"""
         raise NotImplementedError()
 
     @abstractmethod

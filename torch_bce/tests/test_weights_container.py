@@ -3,7 +3,7 @@ from tempfile import TemporaryDirectory
 
 import torch
 
-from src.containers import WeightsContainer
+from torch_bce.containers import WeightsContainer
 
 """Examples"""
 w_k_1 = torch.randn((128, 32))

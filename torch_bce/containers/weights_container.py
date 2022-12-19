@@ -4,7 +4,7 @@ from functools import reduce
 
 import torch
 
-from src.interfaces import Saveable
+from torch_bce.interfaces import Saveable
 
 
 class WeightsContainer(list, Saveable):

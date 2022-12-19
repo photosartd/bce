@@ -11,8 +11,8 @@ from torchmetrics import MetricCollection
 from torchmetrics.classification import MulticlassF1Score, MulticlassAccuracy, MulticlassPrecision, MulticlassRecall
 from torchmetrics.regression import MeanAbsoluteError, MeanSquaredError, MeanAbsolutePercentageError
 
-from src.interfaces import ModelInterface
-from src.utils.constants import ModelType
+from torch_bce.interfaces import ModelInterface
+from torch_bce.utils.constants import ModelType
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARN)

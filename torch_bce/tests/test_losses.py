@@ -4,7 +4,7 @@ import logging
 import torch
 import torch.nn.functional as F
 
-from src.losses import BackwardTransformation, AlignmentLoss, MultiStepAlignment
+from torch_bce.losses import BackwardTransformation, AlignmentLoss, MultiStepAlignment
 
 logger = logging.getLogger("TestAlignment")
 logger.setLevel(logging.INFO)

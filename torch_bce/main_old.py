@@ -7,10 +7,10 @@ import torch_geometric.transforms as T
 from torch_geometric.datasets import Planetoid, Reddit
 import wandb
 
-from src.models import GraphSAGE, MLPClassifier
-from src.utils import PositiveNegativeNeighbourSampler
-from src.utils.datasets import TensorSupervisedDataset
-from src.losses import GraphSageLoss
+from torch_bce.models import GraphSAGE, MLPClassifier
+from torch_bce.utils import PositiveNegativeNeighbourSampler
+from torch_bce.utils.datasets import TensorSupervisedDataset
+from torch_bce.losses import GraphSageLoss
 
 
 logger = logging.getLogger("bce")

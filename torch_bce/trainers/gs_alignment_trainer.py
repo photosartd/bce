@@ -4,10 +4,10 @@ from typing import Tuple, Union, Dict
 import torch
 import torch_geometric as tg
 
-from src.interfaces import ModelInterface
-from src.models import GraphSAGE
-from src.interfaces.trainer_interface import AlignmentTrainerInterface
-from src.utils import PositiveNegativeNeighbourSampler
+from torch_bce.interfaces import ModelInterface
+from torch_bce.models import GraphSAGE
+from torch_bce.interfaces.trainer_interface import AlignmentTrainerInterface
+from torch_bce.utils import PositiveNegativeNeighbourSampler
 
 
 class GSAlignmentTrainer(AlignmentTrainerInterface):

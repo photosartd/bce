@@ -11,10 +11,10 @@ from torch.utils.data import DataLoader
 from torch_geometric_temporal.dataset import ChickenpoxDatasetLoader, WikiMathsDatasetLoader
 from torch_geometric_temporal.signal import temporal_signal_split
 
-from src.models import GraphSAGE, MLPRegressor
-from src.losses import GraphSageLoss
-from src.utils.datasets import TensorSupervisedDataset
-from src.trainers.gs_alignment_trainer import GSAlignmentTrainer
+from torch_bce.models import GraphSAGE, MLPRegressor
+from torch_bce.losses import GraphSageLoss
+from torch_bce.utils.datasets import TensorSupervisedDataset
+from torch_bce.trainers.gs_alignment_trainer import GSAlignmentTrainer
 
 KWARGS = {
     "lambda_": 2,

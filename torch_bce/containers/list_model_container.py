@@ -1,8 +1,8 @@
 import os
 from typing import List, Type
 
-from src.interfaces import ModelInterface
-from src.interfaces.container_interface import ContainerInterface
+from torch_bce.interfaces import ModelInterface
+from torch_bce.interfaces.container_interface import ContainerInterface
 
 
 class ListModelContainer(ContainerInterface):

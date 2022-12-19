@@ -4,8 +4,8 @@ from typing import Collection, List
 
 import torch
 
-from src.interfaces import ModelInterface
-from src.interfaces import Saveable
+from torch_bce.interfaces import ModelInterface
+from torch_bce.interfaces import Saveable
 
 
 class ContainerInterface(Saveable, ABC):

@@ -8,8 +8,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import SAGEConv
 
-from src.interfaces import ModelInterface
-from src.utils.constants import ModelType
+from torch_bce.interfaces import ModelInterface
+from torch_bce.utils.constants import ModelType
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARN)

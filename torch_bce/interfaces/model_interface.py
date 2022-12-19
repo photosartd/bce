@@ -7,9 +7,9 @@ import torch
 import torch.nn as nn
 from torchmetrics import MetricCollection
 
-from src.interfaces import Saveable
-from src.utils.metrics import ZeroMetric
-from src.utils.constants import ModelType
+from torch_bce.interfaces import Saveable
+from torch_bce.utils.metrics import ZeroMetric
+from torch_bce.utils.constants import ModelType
 
 
 class ModelInterface(nn.Module, Saveable, ABC):

@@ -4,9 +4,9 @@ from tempfile import TemporaryDirectory
 
 import torch
 
-from src.models import GraphSAGE
-from src.losses import GraphSageLoss
-from src.containers import ListModelContainer
+from torch_bce.models import GraphSAGE
+from torch_bce.losses import GraphSageLoss
+from torch_bce.containers import ListModelContainer
 
 """Examples"""
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
