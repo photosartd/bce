@@ -6,8 +6,9 @@ RUN pip --no-cache-dir install torch-geometric-temporal==0.54.0
 
 COPY . .
 WORKDIR .
-ARG command=src/main.py
+RUN pip install -e .
+ARG command=torch_bce/main.py
 ENV command_env=$command
-ENV PYTHONPATH "${PYTHONPATH}:/"
+#ENV PYTHONPATH "${PYTHONPATH}:/"
 ENTRYPOINT python ${command_env}
 #CMD "python ${command}"
