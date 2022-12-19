@@ -149,6 +149,7 @@ class AlignmentTrainerInterface(TrainerInterface, ABC):
             M=M,
             N=N
         )
+        alignment_loss.to(self.device)
         return alignment_loss
 
     def configure_alignment_optimizer(self, lr: float = 3e-1, weight_decay: float = 4e-2,
@@ -248,7 +249,7 @@ class AlignmentTrainerInterface(TrainerInterface, ABC):
             self.logger.warning("train_data in `replace_model` must not be None")
         else:
             predictions, val_model_loss, val_alignment_loss = self.validate_model(train_data, **kwargs)
-            self.prev_embeddings = TensorDataset(x=predictions)
+            self.prev_embeddings = TensorDataset(x=predictions.to(self.device))
 
         prev_model = self.current_model
         self.models.add(model)

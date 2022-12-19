@@ -187,7 +187,7 @@ class TestGSAlignmentTrainer(unittest.TestCase):
             trainer.log_metrics(epoch, statistics)
         self.check_strictly_decreasing_trend(losses)
 
-    @unittest.skip("Skipped model training test")
+    #@unittest.skip("Skipped model training test")
     def test_train_intended_unintended_2stage(self):
         N_EPOCHS = 4
         train_dataset, test_dataset = self.get_data
