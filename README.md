@@ -38,4 +38,7 @@ inside the directory.
 To set up the framework, execute `pip install -e .` from inside the directory. There is also [requirements](./requirements.txt)
 file, however some dependencies (e.g., **PyTorch Geometric** and **PyTorch Geometric Temporal** must be installed manually,
 as it is done in Dockerfile.
-**Important:** work is in progress.
+### Example
+<a target="_blank" href="https://colab.research.google.com/github/photosartd/bce/blob/dev/bce_example.ipynb">
+  <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
+</a>
