@@ -24,7 +24,7 @@ class TrainerInterface(Saveable, ABC):
             :param models: models (of subtype ModelInterface)
             :param device: where to train nets
             :param logger: logging.Logger
-        """
+    """
     models: ListModelContainer
     logger: logging.Logger
     device: torch._C.device = "cuda" if torch.cuda.is_available() else "cpu"
